@@ -29,6 +29,7 @@ class TransactionType(str, Enum):
     transfer = "transfer"
     adjustment = "adjustment"
     count = "count"
+    out_of_stock = "out_of_stock"
 
 
 class InventoryItemCreate(BaseModel):

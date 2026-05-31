@@ -3,6 +3,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { api, type MissingItem } from '@/lib/api';
+import BarcodeScanner from '@/components/BarcodeScanner';
+import ScanResult from '@/components/ScanResult';
+import type { InventoryItem } from '@/lib/api';
 
 type ActionState = Record<string, 'picking' | 'restocking' | 'removing'>;
 
@@ -13,6 +16,8 @@ export default function MissingPage() {
   const [items, setItems] = useState<MissingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [actions, setActions] = useState<ActionState>({});
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<{ upc: string; item: InventoryItem | null } | null>(null);
 
   useEffect(() => {
     if (!authLoading && !session) router.replace('/login');
@@ -70,6 +75,12 @@ export default function MissingPage() {
     setAction(item.id, null);
   };
 
+  const handleScanDetected = async (upc: string) => {
+    setScanning(false);
+    const results = await api.findByUPC(upc);
+    setScanResult({ upc, item: results[0] ?? null });
+  };
+
   const missing = items.filter(i => i.status === 'missing');
   const picked  = items.filter(i => i.status === 'picked');
 
@@ -102,16 +113,22 @@ export default function MissingPage() {
           <h1 className="text-2xl font-bold text-amber-400">Missing Items</h1>
           <p className="text-xs text-slate-500">{missing.length} to buy · {picked.length} picked</p>
         </div>
-        {picked.length > 0 && (
-          <button
-            onClick={async () => {
-              if (!window.confirm(`Restock all ${picked.length} picked items?`)) return;
-              for (const item of picked) await handleRestock(item);
-            }}
-            className="rounded-lg bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-500">
-            Restock All ({picked.length})
+        <div className="flex gap-2">
+          <button onClick={() => setScanning(true)}
+            className="rounded-lg bg-slate-700 px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-slate-600">
+            📷 Scan
           </button>
-        )}
+          {picked.length > 0 && (
+            <button
+              onClick={async () => {
+                if (!window.confirm(`Restock all ${picked.length} picked items?`)) return;
+                for (const item of picked) await handleRestock(item);
+              }}
+              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-500">
+              Restock All ({picked.length})
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -172,6 +189,31 @@ export default function MissingPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {scanning && (
+        <BarcodeScanner
+          onDetected={handleScanDetected}
+          onClose={() => setScanning(false)}
+        />
+      )}
+
+      {scanResult && (
+        <div className="fixed inset-0 z-40 bg-black/60" onClick={() => setScanResult(null)}>
+          <ScanResult
+            item={scanResult.item}
+            upc={scanResult.upc}
+            missingItems={items}
+            mode="missing"
+            onMarkOut={() => {}}
+            onPick={async (missingId) => {
+              setScanResult(null);
+              const entry = items.find(i => i.id === missingId);
+              if (entry) await handlePick(entry);
+            }}
+            onDismiss={() => setScanResult(null)}
+          />
         </div>
       )}
     </div>

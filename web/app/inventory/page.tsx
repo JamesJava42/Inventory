@@ -6,6 +6,8 @@ import { useAuth } from '@/components/AuthProvider';
 import { api, type InventoryItem } from '@/lib/api';
 import { displayStr } from '@/lib/stock';
 import StockModal from '@/components/StockModal';
+import BarcodeScanner from '@/components/BarcodeScanner';
+import ScanResult from '@/components/ScanResult';
 
 type Modal = { item: InventoryItem; mode: 'add' | 'remove' } | null;
 
@@ -20,6 +22,8 @@ export default function InventoryPage() {
   const [modal, setModal] = useState<Modal>(null);
   const [missingCount, setMissingCount] = useState(0);
   const [markingOut, setMarkingOut] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<{ upc: string; item: InventoryItem | null } | null>(null);
 
   useEffect(() => {
     if (!authLoading && !session) router.replace('/login');
@@ -77,6 +81,12 @@ export default function InventoryPage() {
       });
       await load();
     } catch (e) { console.error(e); }
+  };
+
+  const handleScanDetected = async (upc: string) => {
+    setScanning(false);
+    const results = await api.findByUPC(upc);
+    setScanResult({ upc, item: results[0] ?? null });
   };
 
   const handleMarkOut = async (item: InventoryItem) => {
@@ -143,6 +153,10 @@ export default function InventoryPage() {
               </span>
             )}
           </Link>
+          <button onClick={() => setScanning(true)}
+            className="rounded-lg bg-slate-700 px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-slate-600">
+            📷 Scan
+          </button>
           <button onClick={() => router.push('/inventory/add')}
             className="rounded-lg bg-amber-400 px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-amber-300">
             + Add
@@ -266,6 +280,26 @@ export default function InventoryPage() {
           onClose={() => setModal(null)}
           onConfirm={(c, p, s) => handleAdjust(modal.item, c, p, s, modal.mode === 'remove')}
         />
+      )}
+
+      {scanning && (
+        <BarcodeScanner
+          onDetected={handleScanDetected}
+          onClose={() => setScanning(false)}
+        />
+      )}
+
+      {scanResult && (
+        <div className="fixed inset-0 z-40 bg-black/60" onClick={() => setScanResult(null)}>
+          <ScanResult
+            item={scanResult.item}
+            upc={scanResult.upc}
+            mode="inventory"
+            onMarkOut={async (item) => { setScanResult(null); await handleMarkOut(item); }}
+            onPick={() => {}}
+            onDismiss={() => setScanResult(null)}
+          />
+        </div>
       )}
     </div>
   );

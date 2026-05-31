@@ -10,8 +10,13 @@ router = APIRouter()
 
 
 @router.get("/", response_model=list[InventoryItemOut])
-def list_items(db=Depends(get_db)):
-    result = db.table("inventory_items").select("*").order("name").execute()
+def list_items(upc: str | None = None, db=Depends(get_db)):
+    q = db.table("inventory_items").select("*")
+    if upc:
+        q = q.eq("upc", upc)
+    else:
+        q = q.order("name")
+    result = q.execute()
     return result.data
 
 

@@ -76,6 +76,7 @@ export interface MissingItem {
 
 export const api = {
   listItems: () => req<InventoryItem[]>('/inventory/'),
+  findByUPC: (upc: string) => req<InventoryItem[]>(`/inventory/?upc=${encodeURIComponent(upc)}`),
   createItem: (body: CreateItemPayload) =>
     req<InventoryItem>('/inventory/', { method: 'POST', body: JSON.stringify(body) }),
   itemHistory: (id: string) => req<Transaction[]>(`/inventory/${id}/history`),
